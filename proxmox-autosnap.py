@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 import os
 import re
-import sys
 import json
 import socket
 import argparse
 import functools
 import subprocess
-from pathlib import Path
 from datetime import datetime, timedelta
 
 
@@ -15,12 +13,12 @@ def running(func):
     @functools.wraps(func)
     def create_pid(*args, **kwargs):
         pid = str(os.getpid())
-        location = Path(__file__).resolve().parent
-        location_pid = str(location.joinpath('running.pid'))
+        location = os.path.dirname(os.path.realpath(__file__))
+        location_pid = os.path.join(location, 'running.pid')
         if os.path.isfile(location_pid):
-            with open(location_pid, 'r') as f:
+            with open(location_pid) as f:
                 print('Script already running under PID {0}, skipping execution.'.format(f.read()))
-            sys.exit(1)
+            raise SystemExit(1)
         try:
             with open(location_pid, 'w') as f:
                 f.write(pid)
@@ -30,8 +28,8 @@ def running(func):
     return create_pid
 
 
-def run_command(command_line: list):
-    run = subprocess.Popen(command_line, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+def run_command(command: list) -> dict:
+    run = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     out, err = run.communicate()
     if run.returncode == 0:
         return {'status': True, 'message': out.rstrip()}
@@ -39,10 +37,10 @@ def run_command(command_line: list):
         return {'status': False, 'message': err.rstrip()}
 
 
-def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist'):
+def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
     vm_id = {}
-    node = socket.gethostname()
-    with open(vmlist_path, 'r') as vmlist:
+    node = socket.gethostname().split('.')[0]
+    with open(vmlist_path) as vmlist:
         data = json.load(vmlist)
     for key, value in data['ids'].items():
         if value['type'] == 'lxc' and value['node'] == node and key not in exclude:
@@ -58,10 +56,10 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily', mute: 
     prefix = datetime.strftime(datetime.now() + timedelta(seconds=1), '%y%m%d%H%M%S')
     snapshot_name = name[label] + prefix
     run = run_command([virtualization, 'snapshot', vmid, snapshot_name, '--description', 'autosnap'])
-    if not run['status']:
-        print('VM {0} - {1}'.format(vmid, run['message']))
-    else:
+    if run['status']:
         print('VM {0} - Creating snapshot {1}'.format(vmid, snapshot_name)) if not mute else None
+    else:
+        print('VM {0} - {1}'.format(vmid, run['message']))
 
 
 @running
@@ -70,23 +68,19 @@ def remove_snapsot(vmid: str, virtualization: str, label: str = 'daily', keep: i
     snapshots = run_command([virtualization, 'listsnapshot', vmid])
 
     for snapshot in snapshots['message'].splitlines():
-        snapshot = snapshot.split()[0]
-        re_snapshot = re.search(label, snapshot)
-        if re_snapshot is not None:
-            listsnapshot.append(snapshot)
+        snapshot = re.search(r'auto{0}\d+'.format(label), snapshot)
+        if snapshot is not None:
+            listsnapshot.append(snapshot.group(0))
 
     if listsnapshot and len(listsnapshot) > keep:
-        old_snapshots = []
-        for num, snap in enumerate(sorted(listsnapshot, reverse=True), 1):
-            if num > keep:
-                old_snapshots.append(snap)
+        old_snapshots = [snap for num, snap in enumerate(sorted(listsnapshot, reverse=True), 1) if num > keep]
         if old_snapshots:
             for old_snapshot in old_snapshots:
                 run = run_command([virtualization, 'delsnapshot', vmid, old_snapshot])
-                if not run['status']:
-                    print('VM {0} - {1}'.format(vmid, run['message']))
-                else:
+                if run['status']:
                     print('VM {0} - Removing snapshot {1}'.format(vmid, old_snapshot)) if not mute else None
+                else:
+                    print('VM {0} - {1}'.format(vmid, run['message']))
 
 
 if __name__ == '__main__':
@@ -103,7 +97,7 @@ if __name__ == '__main__':
                         help='Space separated list of CT/VM ID to exclude from processing.')
     parser.add_argument('-m', '--mute', action='store_true', help='Output only errors.')
     argp = parser.parse_args()
-    all_vmid = vmid_list(argp.exclude)
+    all_vmid = vmid_list(exclude=argp.exclude)
     if argp.snap:
         if 'all' in argp.vmid:
             for k, v in all_vmid.items():
