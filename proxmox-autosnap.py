@@ -29,12 +29,12 @@ def running(func):
 
 
 def run_command(command: list) -> dict:
-    run = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    run = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = run.communicate()
     if run.returncode == 0:
-        return {'status': True, 'message': out.rstrip()}
+        return {'status': True, 'message': out.decode('utf-8').rstrip()}
     else:
-        return {'status': False, 'message': err.rstrip()}
+        return {'status': False, 'message': err.decode('utf-8').rstrip()}
 
 
 def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
