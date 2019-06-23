@@ -68,7 +68,7 @@ def remove_snapsot(vmid: str, virtualization: str, label: str = 'daily', keep: i
     snapshots = run_command([virtualization, 'listsnapshot', vmid])
 
     for snapshot in snapshots['message'].splitlines():
-        snapshot = re.search(r'auto{0}\d+'.format(label), snapshot)
+        snapshot = re.search(r'auto{0}\d+'.format(label), snapshot.replace('`->', '').split()[0])
         if snapshot is not None:
             listsnapshot.append(snapshot.group(0))
 
