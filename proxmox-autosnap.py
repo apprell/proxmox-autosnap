@@ -25,6 +25,7 @@ def running(func):
             return func(*args, **kwargs)
         finally:
             os.unlink(location_pid)
+
     return create_pid
 
 
@@ -35,6 +36,15 @@ def run_command(command: list) -> dict:
         return {'status': True, 'message': out.decode('utf-8', 'replace').rstrip()}
     else:
         return {'status': False, 'message': err.decode('utf-8', 'replace').rstrip()}
+
+
+def vm_is_stopped(vmid: str, virtualization: str) -> bool:
+    run = run_command([virtualization, 'status', vmid])
+    if run['status']:
+        if 'stopped' in run['message'].lower():
+            return True
+
+    return False
 
 
 def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
@@ -50,8 +60,12 @@ def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
     return vm_id
 
 
-@running
-def create_snapshot(vmid: str, virtualization: str, label: str = 'daily', mute: bool = False):
+def create_snapshot(vmid: str, virtualization: str, label: str = 'daily', mute: bool = False,
+                    only_on_running: bool = False):
+    if only_on_running and vm_is_stopped(vmid, virtualization):
+        print('VM {0} - status is stopped, skipping...'.format(vmid)) if not mute else None
+        return
+
     name = {'hourly': 'autohourly', 'daily': 'autodaily', 'weekly': 'autoweekly', 'monthly': 'automonthly'}
     prefix = datetime.strftime(datetime.now() + timedelta(seconds=1), '%y%m%d%H%M%S')
     snapshot_name = name[label] + prefix
@@ -62,8 +76,12 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily', mute: 
         print('VM {0} - {1}'.format(vmid, run['message']))
 
 
-@running
-def remove_snapsot(vmid: str, virtualization: str, label: str = 'daily', keep: int = 30, mute: bool = False):
+def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: int = 30, mute: bool = False,
+                    only_on_running: bool = False):
+    if only_on_running and vm_is_stopped(vmid, virtualization):
+        print('VM {0} - status is stopped, skipping...'.format(vmid)) if not mute else None
+        return
+
     listsnapshot = []
     snapshots = run_command([virtualization, 'listsnapshot', vmid])
 
@@ -83,7 +101,8 @@ def remove_snapsot(vmid: str, virtualization: str, label: str = 'daily', keep: i
                     print('VM {0} - {1}'.format(vmid, run['message']))
 
 
-if __name__ == '__main__':
+@running
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--autosnap', action='store_true', help='Create a snapshot and delete the old one.')
     parser.add_argument('-s', '--snap', action='store_true', help='Create a snapshot but do not delete anything.')
@@ -96,30 +115,44 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--exclude', nargs='+', default=[],
                         help='Space separated list of CT/VM ID to exclude from processing.')
     parser.add_argument('-m', '--mute', action='store_true', help='Output only errors.')
+    parser.add_argument('-r', '--running', action='store_true', help='Run only on running vm, skip on stopped')
     argp = parser.parse_args()
     all_vmid = vmid_list(exclude=argp.exclude)
+
     if argp.snap:
         if 'all' in argp.vmid:
             for k, v in all_vmid.items():
-                create_snapshot(vmid=k, virtualization=v, label=argp.label, mute=argp.mute)
+                create_snapshot(vmid=k, virtualization=v, label=argp.label, mute=argp.mute,
+                                only_on_running=argp.running)
         else:
             for vm in argp.vmid:
-                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, mute=argp.mute)
+                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, mute=argp.mute,
+                                only_on_running=argp.running)
     elif argp.clean:
         if 'all' in argp.vmid:
             for k, v in all_vmid.items():
-                remove_snapsot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep, mute=argp.mute)
+                remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep, mute=argp.mute,
+                                only_on_running=argp.running)
         else:
             for vm in argp.vmid:
-                remove_snapsot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep, mute=argp.mute)
+                remove_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep, mute=argp.mute,
+                                only_on_running=argp.running)
     elif argp.autosnap:
         if 'all' in argp.vmid:
             for k, v in all_vmid.items():
-                create_snapshot(vmid=k, virtualization=v, label=argp.label, mute=argp.mute)
-                remove_snapsot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep, mute=argp.mute)
+                create_snapshot(vmid=k, virtualization=v, label=argp.label, mute=argp.mute,
+                                only_on_running=argp.running)
+                remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep, mute=argp.mute,
+                                only_on_running=argp.running)
         else:
             for vm in argp.vmid:
-                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, mute=argp.mute)
-                remove_snapsot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep, mute=argp.mute)
+                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, mute=argp.mute,
+                                only_on_running=argp.running)
+                remove_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep, mute=argp.mute,
+                                only_on_running=argp.running)
     else:
         parser.print_help()
+
+
+if __name__ == '__main__':
+    main()

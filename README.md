@@ -22,6 +22,7 @@ ln -s /root/proxmox-autosnap/autosnap /etc/cron.d/autosnap
 | clean     | no       | bool | false   | Delete all or selected autosnapshots.                            |
 | exclude   | no       | list | empty   | Space separated list of CT/VM ID to exclude from processing.     |
 | mute      | no       | bool | false   | Output only errors.                                              |
+| running   | no       | bool | false   | Run only on running vm, skip on stopped.                         |
 
 > proxmox-autosnap.py --help
 
@@ -30,6 +31,9 @@ ln -s /root/proxmox-autosnap/autosnap /etc/cron.d/autosnap
 ```bash
 # Create a daily snapshot for all VM
 proxmox-autosnap.py --snap --vmid all
+
+# Create snapshot only on running vm
+proxmox-autosnap.py --snap --vmid all --running
 
 # Create a daily snapshot for selected VM
 proxmox-autosnap.py --snap --vmid 100 101 102
