@@ -12,17 +12,19 @@ ln -s /root/proxmox-autosnap/autosnap /etc/cron.d/autosnap
 
 ## Help
 
-| Arguments | Required | Type | Default | Description                                                      |
-|-----------|----------|------|---------|------------------------------------------------------------------|
-| vmid      | yes      | list | empty   | Space separated list of CT/VM ID or `all` for all CT/VM in node. |
-| snap      | yes      | bool | false   | Create a snapshot but do not delete anything.                    |
-| autosnap  | no       | bool | false   | Create a snapshot and delete the old one.                        |
-| keep      | no       | int  | 30      | The number of snapshots which should will keep.                  |
-| label     | no       | str  | daily   | One of `hourly`, `daily`, `weekly`, `monthly`.                   |
-| clean     | no       | bool | false   | Delete all or selected autosnapshots.                            |
-| exclude   | no       | list | empty   | Space separated list of CT/VM ID to exclude from processing.     |
-| mute      | no       | bool | false   | Output only errors.                                              |
-| running   | no       | bool | false   | Run only on running vm, skip on stopped.                         |
+| Arguments      | Required | Type | Default | Description                                                      |
+|----------------|----------|------|---------|------------------------------------------------------------------|
+| vmid           | yes      | list | empty   | Space separated list of CT/VM ID or `all` for all CT/VM in node. |
+| snap           | yes      | bool | false   | Create a snapshot but do not delete anything.                    |
+| autosnap       | no       | bool | false   | Create a snapshot and delete the old one.                        |
+| keep           | no       | int  | 30      | The number of snapshots which should will keep.                  |
+| label          | no       | str  | daily   | One of `hourly`, `daily`, `weekly`, `monthly`.                   |
+| clean          | no       | bool | false   | Delete all or selected autosnapshots.                            |
+| exclude        | no       | list | empty   | Space separated list of CT/VM ID to exclude from processing.     |
+| mute           | no       | bool | false   | Output only errors.                                              |
+| running        | no       | bool | false   | Run only on running vm, skip on stopped.                         |
+| includevmstate | no       | bool | false   | Include the VM state in snapshots.                               |
+| dryrun         | no       | bool | false   | Do not create or delete snapshots, just print the commands.      |
 
 > proxmox-autosnap.py --help
 
