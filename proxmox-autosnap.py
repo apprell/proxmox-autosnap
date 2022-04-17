@@ -54,9 +54,9 @@ def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
         data = json.load(vmlist)
     for key, value in data['ids'].items():
         if value['type'] == 'lxc' and value['node'] == node and key not in exclude:
-            vm_id[key] = 'pct'            
+            vm_id[key] = 'pct'
         elif value['type'] == 'qemu' and value['node'] == node and key not in exclude:
-            vm_id[key] = 'qm'            
+            vm_id[key] = 'qm'
     return vm_id
 
 
@@ -121,13 +121,14 @@ def main():
     parser.add_argument('-c', '--clean', action='store_true', help='Delete all or selected autosnapshots.')
     parser.add_argument('-k', '--keep', type=int, default=30, help='The number of snapshots which should will keep.')
     parser.add_argument('-l', '--label', choices=['hourly', 'daily', 'weekly', 'monthly'], default='daily',
-                        help='One of hourly, daily, weekly, monthly.')    
+                        help='One of hourly, daily, weekly, monthly.')
     parser.add_argument('-e', '--exclude', nargs='+', default=[],
                         help='Space separated list of CT/VM ID to exclude from processing.')
     parser.add_argument('-m', '--mute', action='store_true', help='Output only errors.')
     parser.add_argument('-r', '--running', action='store_true', help='Run only on running vm, skip on stopped')
     parser.add_argument('-i', '--includevmstate', action='store_true', help='Include the VM state in snapshots.')
-    parser.add_argument('-d', '--dryrun', action='store_true', help='Do not create or delete snapshots, just print the commands.')
+    parser.add_argument('-d', '--dryrun', action='store_true',
+                        help='Do not create or delete snapshots, just print the commands.')
     argp = parser.parse_args()
     all_vmid = vmid_list(exclude=argp.exclude)
 
