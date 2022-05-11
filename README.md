@@ -9,7 +9,6 @@ git clone https://github.com/apprell/proxmox-autosnap.git
 ln -s /root/proxmox-autosnap/proxmox-autosnap.py /usr/local/sbin/proxmox-autosnap.py
 ln -s /root/proxmox-autosnap/autosnap /etc/cron.d/autosnap
 chmod +x /root/proxmox-autosnap/proxmox-autosnap.py
-
 ```
 
 ## Help
