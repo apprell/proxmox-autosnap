@@ -38,8 +38,8 @@ def run_command(command: list) -> dict:
         return {'status': False, 'message': err.decode('utf-8', 'replace').rstrip()}
 
 
-def vm_is_stopped(vmid: str, virtualization: str) -> bool:
-    run = run_command([virtualization, 'status', vmid])
+def vm_is_stopped(vmid: str, virtualization: list[str]) -> bool:
+    run = run_command(virtualization + ['status', vmid])
     if run['status']:
         if 'stopped' in run['message'].lower():
             return True
@@ -47,20 +47,26 @@ def vm_is_stopped(vmid: str, virtualization: str) -> bool:
     return False
 
 
-def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
+def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist', sudo: bool = False) -> dict:
     vm_id = {}
     node = socket.gethostname().split('.')[0]
-    with open(vmlist_path) as vmlist:
-        data = json.load(vmlist)
+    if sudo:
+        data = json.loads(subprocess.check_output(["sudo", "cat", vmlist_path], encoding="utf-8"))
+    else:
+        with open(vmlist_path) as vmlist:
+            data = json.load(vmlist)
+
     for key, value in data['ids'].items():
         if value['type'] == 'lxc' and value['node'] == node and key not in exclude:
-            vm_id[key] = 'pct'
+            vm_id[key] = ['pct']
         elif value['type'] == 'qemu' and value['node'] == node and key not in exclude:
-            vm_id[key] = 'qm'
+            vm_id[key] = ['qm']
+        if key in vm_id and sudo:
+            vm_id[key].insert(0, "sudo")
     return vm_id
 
 
-def create_snapshot(vmid: str, virtualization: str, label: str = 'daily', mute: bool = False,
+def create_snapshot(vmid: str, virtualization: list[str], label: str = 'daily', mute: bool = False,
                     only_on_running: bool = False, savevmstate: bool = False, dryrun: bool = False,
                     date_iso_format: bool = False):
     if only_on_running and vm_is_stopped(vmid, virtualization):
@@ -74,8 +80,8 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily', mute: 
     else:
         suffix = suffix_datetime.strftime('%y%m%d%H%M%S')
     snapshot_name = name[label] + suffix
-    params = [virtualization, 'snapshot', vmid, snapshot_name, '--description', 'autosnap']
-    if virtualization == 'qm' and savevmstate:
+    params = virtualization + ['snapshot', vmid, snapshot_name, '--description', 'autosnap']
+    if virtualization[-1] == 'qm' and savevmstate:
         params.append('--vmstate')
     if dryrun:
         print(' '.join(params)) if not mute else None
@@ -87,14 +93,14 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily', mute: 
             print('VM {0} - {1}'.format(vmid, run['message']))
 
 
-def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: int = 30, mute: bool = False,
+def remove_snapshot(vmid: str, virtualization: list[str], label: str = 'daily', keep: int = 30, mute: bool = False,
                     only_on_running: bool = False, dryrun: bool = False):
     if only_on_running and vm_is_stopped(vmid, virtualization):
         print('VM {0} - status is stopped, skipping...'.format(vmid)) if not mute else None
         return
 
     listsnapshot = []
-    snapshots = run_command([virtualization, 'listsnapshot', vmid])
+    snapshots = run_command(virtualization + ['listsnapshot', vmid])
 
     for snapshot in snapshots['message'].splitlines():
         snapshot = re.search(r'auto{0}([_0-9T]+$)'.format(label), snapshot.replace('`->', '').split()[0])
@@ -105,7 +111,7 @@ def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: 
         old_snapshots = [snap for num, snap in enumerate(sorted(listsnapshot, reverse=True), 1) if num > keep]
         if old_snapshots:
             for old_snapshot in old_snapshots:
-                params = [virtualization, 'delsnapshot', vmid, old_snapshot]
+                params = virtualization + ['delsnapshot', vmid, old_snapshot]
                 if dryrun:
                     print(' '.join(params)) if not mute else None
                 else:
@@ -135,8 +141,10 @@ def main():
     parser.add_argument('-i', '--includevmstate', action='store_true', help='Include the VM state in snapshots.')
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='Do not create or delete snapshots, just print the commands.')
+    parser.add_argument('--sudo', action='store_true',
+                        help='Launch commands through sudo')
     argp = parser.parse_args()
-    all_vmid = vmid_list(exclude=argp.exclude)
+    all_vmid = vmid_list(exclude=argp.exclude, sudo=argp.sudo)
 
     if argp.snap:
         if 'all' in argp.vmid:
