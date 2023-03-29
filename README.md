@@ -29,6 +29,7 @@ chmod +x /root/proxmox-autosnap/proxmox-autosnap.py
 | date-iso-format     | no       | bool | false   | Store snapshots in ISO 8601 format.                              |
 | date-truenas-format | no       | bool | false   | Store snapshots in TrueNAS format.                               |
 | sudo                | no       | bool | false   | Launch commands through sudo.                                    |
+| zfs-send-to         | no       | str  | empty   | Send a copy of zfs subvolumes to another host via syncoid        |
 
 > proxmox-autosnap.py --help
 
@@ -82,6 +83,16 @@ After that you can run the script with the argument
 ```bash
 proxmox-autosnap.py --snap --vmid 100 --date-iso-format --sudo
 ```
+
+## zfs-send-to
+
+To use option `zfs-send-to`, you need to install `syncoid`, and enable zfs
+permissions on both local and target hosts. See [documentation on configuring zfs allow for syncoid](https://github.com/jimsalterjrs/sanoid/wiki/Syncoid#running-without-root)
+for more information.
+
+Option should be set to `[user@]host:zfsdir`. All subvolumes of specified VMs
+will be copied to this path, including `rootfs` and `mpX` mount points with
+backup option enabled on Proxmox.
 
 ## Cron
 
