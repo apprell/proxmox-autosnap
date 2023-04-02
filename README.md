@@ -27,6 +27,7 @@ chmod +x /root/proxmox-autosnap/proxmox-autosnap.py
 | includevmstate  | no       | bool | false   | Include the VM state in snapshots.                               |
 | dryrun          | no       | bool | false   | Do not create or delete snapshots, just print the commands.      |
 | date-iso-format | no       | bool | false   | Store snapshots in ISO 8601 format.                              |
+| sudo            | no       | bool | false   | Launch commands through sudo.                                    |
 
 > proxmox-autosnap.py --help
 
@@ -58,6 +59,22 @@ proxmox-autosnap.py --clean --vmid all --label hourly --keep 0
 # Example autodaily_2023_03_22T01_26_23
 # It is not necessary to specify the --date-iso-format argument to delete snapshots 
 proxmox-autosnap.py --snap --vmid 100 --date-iso-format
+```
+
+## SUDO
+
+In order to run with sudo argument, you must first create a user and specify minimum accesses for him, for example:
+
+`cat /etc/sudoers.d/proxmox-backup`
+
+```bash
+proxmox-backup ALL=NOPASSWD: /usr/bin/cat /etc/pve/.vmlist, /usr/sbin/pct snapshot *, /usr/sbin/pct listsnapshot *, /usr/sbin/pct delsnapshot *, /usr/sbin/qm snapshot *, /usr/sbin/qm listsnapshot *, /usr/sbin/qm delsnapshot *
+```
+
+After that you can run the script with the argument
+
+```bash
+proxmox-autosnap.py --snap --vmid 100 --date-iso-format --sudo
 ```
 
 ## Cron

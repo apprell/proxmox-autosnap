@@ -8,6 +8,13 @@ import functools
 import subprocess
 from datetime import datetime, timedelta
 
+MUTE = False
+DRY_RUN = False
+USE_SUDO = False
+ONLY_ON_RUNNING = False
+DATE_ISO_FORMAT = False
+INCLUDE_VM_STATE = False
+
 
 def running(func):
     @functools.wraps(func)
@@ -30,6 +37,9 @@ def running(func):
 
 
 def run_command(command: list) -> dict:
+    if USE_SUDO:
+        command.insert(0, 'sudo')
+
     run = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = run.communicate()
     if run.returncode == 0:
@@ -50,47 +60,52 @@ def vm_is_stopped(vmid: str, virtualization: str) -> bool:
 def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
     vm_id = {}
     node = socket.gethostname().split('.')[0]
-    with open(vmlist_path) as vmlist:
-        data = json.load(vmlist)
+
+    run = run_command(['cat', vmlist_path])
+    if not run['status']:
+        raise SystemExit(run['message'])
+
+    data = json.loads(run['message'])
     for key, value in data['ids'].items():
         if value['type'] == 'lxc' and value['node'] == node and key not in exclude:
             vm_id[key] = 'pct'
         elif value['type'] == 'qemu' and value['node'] == node and key not in exclude:
             vm_id[key] = 'qm'
+
     return vm_id
 
 
-def create_snapshot(vmid: str, virtualization: str, label: str = 'daily', mute: bool = False,
-                    only_on_running: bool = False, savevmstate: bool = False, dryrun: bool = False,
-                    date_iso_format: bool = False):
-    if only_on_running and vm_is_stopped(vmid, virtualization):
-        print('VM {0} - status is stopped, skipping...'.format(vmid)) if not mute else None
+def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> None:
+    if ONLY_ON_RUNNING and vm_is_stopped(vmid, virtualization):
+        print('VM {0} - status is stopped, skipping...'.format(vmid)) if not MUTE else None
         return
 
     name = {'hourly': 'autohourly', 'daily': 'autodaily', 'weekly': 'autoweekly', 'monthly': 'automonthly'}
     suffix_datetime = datetime.now() + timedelta(seconds=1)
-    if date_iso_format:
+    if DATE_ISO_FORMAT:
         suffix = "_" + suffix_datetime.isoformat(timespec="seconds").replace("-", "_").replace(":", "_")
     else:
         suffix = suffix_datetime.strftime('%y%m%d%H%M%S')
     snapshot_name = name[label] + suffix
     params = [virtualization, 'snapshot', vmid, snapshot_name, '--description', 'autosnap']
-    if virtualization == 'qm' and savevmstate:
+
+    if virtualization == 'qm' and INCLUDE_VM_STATE:
         params.append('--vmstate')
-    if dryrun:
-        print(' '.join(params)) if not mute else None
+
+    if DRY_RUN:
+        params.insert(0, 'sudo') if USE_SUDO else None
+        print(' '.join(params))
     else:
         run = run_command(params)
         if run['status']:
-            print('VM {0} - Creating snapshot {1}'.format(vmid, snapshot_name)) if not mute else None
+            print('VM {0} - Creating snapshot {1}'.format(vmid, snapshot_name)) if not MUTE else None
         else:
             print('VM {0} - {1}'.format(vmid, run['message']))
 
 
-def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: int = 30, mute: bool = False,
-                    only_on_running: bool = False, dryrun: bool = False):
-    if only_on_running and vm_is_stopped(vmid, virtualization):
-        print('VM {0} - status is stopped, skipping...'.format(vmid)) if not mute else None
+def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: int = 30) -> None:
+    if ONLY_ON_RUNNING and vm_is_stopped(vmid, virtualization):
+        print('VM {0} - status is stopped, skipping...'.format(vmid)) if not MUTE else None
         return
 
     listsnapshot = []
@@ -106,12 +121,13 @@ def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: 
         if old_snapshots:
             for old_snapshot in old_snapshots:
                 params = [virtualization, 'delsnapshot', vmid, old_snapshot]
-                if dryrun:
-                    print(' '.join(params)) if not mute else None
+                if DRY_RUN:
+                    params.insert(0, 'sudo') if USE_SUDO else None
+                    print(' '.join(params))
                 else:
                     run = run_command(params)
                     if run['status']:
-                        print('VM {0} - Removing snapshot {1}'.format(vmid, old_snapshot)) if not mute else None
+                        print('VM {0} - Removing snapshot {1}'.format(vmid, old_snapshot)) if not MUTE else None
                     else:
                         print('VM {0} - {1}'.format(vmid, run['message']))
 
@@ -135,44 +151,42 @@ def main():
     parser.add_argument('-i', '--includevmstate', action='store_true', help='Include the VM state in snapshots.')
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='Do not create or delete snapshots, just print the commands.')
+    parser.add_argument('--sudo', action='store_true', help='Launch commands through sudo.')
     argp = parser.parse_args()
+
+    global MUTE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT
+    MUTE = argp.mute
+    DRY_RUN = argp.dryrun
+    USE_SUDO = argp.sudo
+    ONLY_ON_RUNNING = argp.running
+    DATE_ISO_FORMAT = argp.date_iso_format
+    INCLUDE_VM_STATE = argp.includevmstate
+
     all_vmid = vmid_list(exclude=argp.exclude)
 
     if argp.snap:
         if 'all' in argp.vmid:
             for k, v in all_vmid.items():
-                create_snapshot(vmid=k, virtualization=v, label=argp.label, mute=argp.mute,
-                                only_on_running=argp.running, savevmstate=argp.includevmstate, dryrun=argp.dryrun,
-                                date_iso_format=argp.date_iso_format)
+                create_snapshot(vmid=k, virtualization=v, label=argp.label)
         else:
             for vm in argp.vmid:
-                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, mute=argp.mute,
-                                only_on_running=argp.running, savevmstate=argp.includevmstate, dryrun=argp.dryrun,
-                                date_iso_format=argp.date_iso_format)
+                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label)
     elif argp.clean:
         if 'all' in argp.vmid:
             for k, v in all_vmid.items():
-                remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep, mute=argp.mute,
-                                only_on_running=argp.running, dryrun=argp.dryrun)
+                remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep)
         else:
             for vm in argp.vmid:
-                remove_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep, mute=argp.mute,
-                                only_on_running=argp.running, dryrun=argp.dryrun)
+                remove_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep)
     elif argp.autosnap:
         if 'all' in argp.vmid:
             for k, v in all_vmid.items():
-                create_snapshot(vmid=k, virtualization=v, label=argp.label, mute=argp.mute,
-                                only_on_running=argp.running, savevmstate=argp.includevmstate, dryrun=argp.dryrun,
-                                date_iso_format=argp.date_iso_format)
-                remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep, mute=argp.mute,
-                                only_on_running=argp.running, dryrun=argp.dryrun)
+                create_snapshot(vmid=k, virtualization=v, label=argp.label)
+                remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep)
         else:
             for vm in argp.vmid:
-                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, mute=argp.mute,
-                                only_on_running=argp.running, savevmstate=argp.includevmstate, dryrun=argp.dryrun,
-                                date_iso_format=argp.date_iso_format)
-                remove_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep, mute=argp.mute,
-                                only_on_running=argp.running, dryrun=argp.dryrun)
+                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label)
+                remove_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep)
     else:
         parser.print_help()
 
