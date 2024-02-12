@@ -13,6 +13,7 @@ DRY_RUN = False
 USE_SUDO = False
 ONLY_ON_RUNNING = False
 DATE_ISO_FORMAT = False
+DATE_TRUENAS_FORMAT = False
 INCLUDE_VM_STATE = False
 
 
@@ -84,6 +85,8 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> Non
     suffix_datetime = datetime.now() + timedelta(seconds=1)
     if DATE_ISO_FORMAT:
         suffix = "_" + suffix_datetime.isoformat(timespec="seconds").replace("-", "_").replace(":", "_")
+    elif DATE_TRUENAS_FORMAT:
+        suffix = suffix_datetime.strftime('%Y%m%d%H%M%S')
     else:
         suffix = suffix_datetime.strftime('%y%m%d%H%M%S')
     snapshot_name = name[label] + suffix
@@ -144,6 +147,7 @@ def main():
     parser.add_argument('-l', '--label', choices=['hourly', 'daily', 'weekly', 'monthly'], default='daily',
                         help='One of hourly, daily, weekly, monthly.')
     parser.add_argument('--date-iso-format', action='store_true', help='Store snapshots in ISO 8601 format.')
+    parser.add_argument('--date-truenas-format', action='store_true', help='Store snapshots in TrueNAS format.')
     parser.add_argument('-e', '--exclude', nargs='+', default=[],
                         help='Space separated list of CT/VM ID to exclude from processing.')
     parser.add_argument('-m', '--mute', action='store_true', help='Output only errors.')
@@ -154,12 +158,13 @@ def main():
     parser.add_argument('--sudo', action='store_true', help='Launch commands through sudo.')
     argp = parser.parse_args()
 
-    global MUTE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT
+    global MUTE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT, DATE_TRUENAS_FORMAT
     MUTE = argp.mute
     DRY_RUN = argp.dryrun
     USE_SUDO = argp.sudo
     ONLY_ON_RUNNING = argp.running
     DATE_ISO_FORMAT = argp.date_iso_format
+    DATE_TRUENAS_FORMAT = argp.date_truenas_format
     INCLUDE_VM_STATE = argp.includevmstate
 
     all_vmid = vmid_list(exclude=argp.exclude)
