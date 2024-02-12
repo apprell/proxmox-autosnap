@@ -85,7 +85,7 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> Non
     if DATE_ISO_FORMAT:
         suffix = "_" + suffix_datetime.isoformat(timespec="seconds").replace("-", "_").replace(":", "_")
     else:
-        suffix = suffix_datetime.strftime('%y%m%d%H%M%S')
+        suffix = suffix_datetime.strftime('%Y%m%d%H%M%S')
     snapshot_name = name[label] + suffix
     params = [virtualization, 'snapshot', vmid, snapshot_name, '--description', 'autosnap']
 
