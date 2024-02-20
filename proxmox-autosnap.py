@@ -81,7 +81,8 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> Non
         print('VM {0} - status is stopped, skipping...'.format(vmid)) if not MUTE else None
         return
 
-    name = {'hourly': 'autohourly', 'daily': 'autodaily', 'weekly': 'autoweekly', 'monthly': 'automonthly'}
+    labels = {'minute': 'autominute', 'hourly': 'autohourly', 'daily': 'autodaily', 'weekly': 'autoweekly',
+              'monthly': 'automonthly'}
     suffix_datetime = datetime.now() + timedelta(seconds=1)
     if DATE_ISO_FORMAT:
         suffix = "_" + suffix_datetime.isoformat(timespec="seconds").replace("-", "_").replace(":", "_")
@@ -89,7 +90,7 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> Non
         suffix = suffix_datetime.strftime('%Y%m%d%H%M%S')
     else:
         suffix = suffix_datetime.strftime('%y%m%d%H%M%S')
-    snapshot_name = name[label] + suffix
+    snapshot_name = labels[label] + suffix
     params = [virtualization, 'snapshot', vmid, snapshot_name, '--description', 'autosnap']
 
     if virtualization == 'qm' and INCLUDE_VM_STATE:
@@ -144,8 +145,8 @@ def main():
                         help='Space separated list of CT/VM ID or all for all CT/VM in node.')
     parser.add_argument('-c', '--clean', action='store_true', help='Delete all or selected autosnapshots.')
     parser.add_argument('-k', '--keep', type=int, default=30, help='The number of snapshots which should will keep.')
-    parser.add_argument('-l', '--label', choices=['hourly', 'daily', 'weekly', 'monthly'], default='daily',
-                        help='One of hourly, daily, weekly, monthly.')
+    parser.add_argument('-l', '--label', choices=['minute', 'hourly', 'daily', 'weekly', 'monthly'], default='daily',
+                        help='One of minute, hourly, daily, weekly or monthly.')
     parser.add_argument('--date-iso-format', action='store_true', help='Store snapshots in ISO 8601 format.')
     parser.add_argument('--date-truenas-format', action='store_true', help='Store snapshots in TrueNAS format.')
     parser.add_argument('-e', '--exclude', nargs='+', default=[],
