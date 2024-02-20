@@ -19,7 +19,7 @@ chmod +x /root/proxmox-autosnap/proxmox-autosnap.py
 | snap                | yes      | bool | false   | Create a snapshot but do not delete anything.                    |
 | autosnap            | no       | bool | false   | Create a snapshot and delete the old one.                        |
 | keep                | no       | int  | 30      | The number of snapshots which should will keep.                  |
-| label               | no       | str  | daily   | One of `hourly`, `daily`, `weekly`, `monthly`.                   |
+| label               | no       | str  | daily   | One of `minute`, `hourly`, `daily`, `weekly`, `monthly`.         |
 | clean               | no       | bool | false   | Delete all or selected autosnapshots.                            |
 | exclude             | no       | list | empty   | Space separated list of CT/VM ID to exclude from processing.     |
 | mute                | no       | bool | false   | Output only errors.                                              |
