@@ -170,29 +170,23 @@ def main():
 
     all_vmid = vmid_list(exclude=argp.exclude)
 
+    if 'all' in argp.vmid:
+        picked_vmid = dict(sorted(all_vmid.items()))
+    else:
+        picked_vmid = {}
+        for vm in argp.vmid:
+            picked_vmid[vm] = all_vmid[vm]
+
     if argp.snap:
-        if 'all' in argp.vmid:
-            for k, v in all_vmid.items():
-                create_snapshot(vmid=k, virtualization=v, label=argp.label)
-        else:
-            for vm in argp.vmid:
-                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label)
+        for k, v in picked_vmid.items():
+            create_snapshot(vmid=k, virtualization=v, label=argp.label)
     elif argp.clean:
-        if 'all' in argp.vmid:
-            for k, v in all_vmid.items():
-                remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep)
-        else:
-            for vm in argp.vmid:
-                remove_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep)
+        for k, v in picked_vmid.items():
+            remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep)
     elif argp.autosnap:
-        if 'all' in argp.vmid:
-            for k, v in all_vmid.items():
-                create_snapshot(vmid=k, virtualization=v, label=argp.label)
-                remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep)
-        else:
-            for vm in argp.vmid:
-                create_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label)
-                remove_snapshot(vmid=vm, virtualization=all_vmid[vm], label=argp.label, keep=argp.keep)
+        for k, v in picked_vmid.items():
+            create_snapshot(vmid=k, virtualization=v, label=argp.label)
+            remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep)
     else:
         parser.print_help()
 
