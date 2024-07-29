@@ -37,8 +37,8 @@ def running(func):
     return create_pid
 
 
-def run_command(command: list) -> dict:
-    if USE_SUDO:
+def run_command(command: list, force_no_sudo: bool = False) -> dict:
+    if USE_SUDO and not force_no_sudo:
         command.insert(0, 'sudo')
 
     run = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -57,6 +57,32 @@ def vm_is_stopped(vmid: str, virtualization: str) -> bool:
 
     return False
 
+def get_pve_config(vmid: str, virtualization: str) -> dict:
+    run = run_command([virtualization, 'config', vmid])
+    if not run['status']:
+        raise SystemExit(run['message'])
+
+    cfg = {}
+
+    for line in run["message"].splitlines():
+        if ":" in line:
+            (k, v) = line.split(": ")
+            cfg[k.strip()] = v.strip()
+
+    return cfg
+
+def get_zfs_volume(proxmox_fs: str, virtualization: str) -> str:
+    run = run_command(['pvesm', 'path', proxmox_fs.split(",")[0]])
+    if not run['status']:
+        raise SystemExit(run['message'])
+
+    zfsvol = run['message'].strip()
+    if virtualization == "qm" and zfsvol.startswith("/dev/zvol/"):
+        return zfsvol.removeprefix("/dev/zvol/")
+    elif zfsvol[0] == "/":
+        return zfsvol[1:]
+    else:
+        return zfsvol
 
 def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
     vm_id = {}
@@ -135,6 +161,29 @@ def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: 
                     else:
                         print('VM {0} - {1}'.format(vmid, run['message']))
 
+def zfs_send(vmid: str, virtualization: list[str], zfs_send_to: str):
+    cfg = get_pve_config(vmid, virtualization)
+
+    for k,v in cfg.items():
+        if (k == "rootfs" or
+            (re.fullmatch("mp[0-9]+", k) and ("backup=1" in v)) or
+            (re.fullmatch("(ide|sata|scsi|virtio)[0-9]+", k) and ("backup=0" not in v)) or
+            (re.fullmatch("(efidisk|tpmstate)[0-9]+", k))):
+
+            proxmox_vol = v.split(",")[0]
+            localzfs  = get_zfs_volume(proxmox_vol, virtualization)
+            remotezfs = os.path.join(zfs_send_to, proxmox_vol.split(":")[1])
+
+            params = ("/usr/sbin/syncoid", localzfs, remotezfs, "--identifier=autosnap", "--no-privilege-elevation")
+            if DRY_RUN:
+                print(' '.join(params))
+            else:
+                run = run_command(params, force_no_sudo=True)
+                if run['status']:
+                    print('VM {0} - syncoid to {1}'.format(vmid, zfs_send_to)) if not MUTE else None
+                else:
+                    print('VM {0} - syncoid FAIL: {1}'.format(vmid, run['message']))
+
 
 @running
 def main():
@@ -154,6 +203,7 @@ def main():
     parser.add_argument('-m', '--mute', action='store_true', help='Output only errors.')
     parser.add_argument('-r', '--running', action='store_true', help='Run only on running vm, skip on stopped')
     parser.add_argument('-i', '--includevmstate', action='store_true', help='Include the VM state in snapshots.')
+    parser.add_argument('--zfs-send-to', metavar='[USER@]HOST:ZFSDIR', help='Send zfs snapshot to USER@HOST on ZFSDIR hierarchy - USER@ is optional with syncoid > 2:1')
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='Do not create or delete snapshots, just print the commands.')
     parser.add_argument('--sudo', action='store_true', help='Launch commands through sudo.')
@@ -187,6 +237,9 @@ def main():
         for k, v in picked_vmid.items():
             create_snapshot(vmid=k, virtualization=v, label=argp.label)
             remove_snapshot(vmid=k, virtualization=v, label=argp.label, keep=argp.keep)
+    elif argp.zfs_send_to:
+        for k, v in picked_vmid.items():
+            zfs_send(vmid=k, virtualization=v, zfs_send_to=argp.zfs_send_to)
     else:
         parser.print_help()
 
