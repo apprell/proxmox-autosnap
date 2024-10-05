@@ -49,6 +49,18 @@ def run_command(command: list, force_no_sudo: bool = False) -> dict:
         return {'status': False, 'message': err.decode('utf-8', 'replace').rstrip()}
 
 
+def get_proxmox_version() -> float:
+    result = run_command(['pveversion'], force_no_sudo=True)
+    if not result['status']:
+        raise SystemExit(result['message'])
+
+    version_string = result['message'].split('/')[1].split('-')[0]
+    try:
+        return float(version_string)
+    except ValueError:
+        return float(".".join(version_string.split(".")[:2]))
+
+
 def vm_is_stopped(vmid: str, virtualization: str) -> bool:
     run = run_command([virtualization, 'status', vmid])
     if run['status']:
@@ -87,22 +99,83 @@ def get_zfs_volume(proxmox_fs: str, virtualization: str) -> str:
         return zfsvol
 
 
-def vmid_list(exclude: list, vmlist_path: str = '/etc/pve/.vmlist') -> dict:
-    vm_id = {}
-    node = socket.gethostname().split('.')[0]
-
-    run = run_command(['cat', vmlist_path])
+def get_vmids(exclude: list) -> dict:
+    run = run_command(['cat', '/etc/pve/.vmlist'])
     if not run['status']:
         raise SystemExit(run['message'])
 
-    data = json.loads(run['message'])
-    for key, value in data['ids'].items():
-        if value['type'] == 'lxc' and value['node'] == node and key not in exclude:
-            vm_id[key] = 'pct'
-        elif value['type'] == 'qemu' and value['node'] == node and key not in exclude:
-            vm_id[key] = 'qm'
+    try:
+        json_data = json.loads(run['message'])
+    except json.JSONDecodeError as e:
+        raise SystemExit('Error decoding JSON: {0}'.format(e))
 
-    return vm_id
+    result = {}
+    node = socket.gethostname().split('.')[0]
+    for key, value in json_data['ids'].items():
+        if value['type'] == 'lxc' and value['node'] == node and key not in exclude:
+            result[key] = 'pct'
+        elif value['type'] == 'qemu' and value['node'] == node and key not in exclude:
+            result[key] = 'qm'
+
+    return result
+
+
+def get_vmids_by_tags(tags: list, exclude_tags: list) -> dict:
+    run = run_command(['pvesh', 'get', '/cluster/resources', '--type', 'vm', '--output-format', 'json'])
+    if not run['status']:
+        raise SystemExit(run['message'])
+
+    try:
+        json_data = json.loads(run['message'])
+    except json.JSONDecodeError as e:
+        raise SystemExit('Error decoding JSON: {0}'.format(e))
+
+    result = {'include': [], 'exclude': []}
+    for vm in json_data:
+        vmid = str(vm['vmid'])
+        vm_tags = vm.get('tags', '').split(';')
+
+        if tags and any(tag in vm_tags for tag in tags):
+            result['include'].append(vmid)
+
+        if exclude_tags and any(tag in vm_tags for tag in exclude_tags):
+            result['exclude'].append(vmid)
+
+    return result
+
+
+def get_filtered_vmids(vmids: list, exclude: list, tags: list, exclude_tags: list) -> dict:
+    all_vmid = get_vmids(exclude=exclude)
+    picked_vmid = {}
+
+    if vmids and 'all' in vmids:
+        picked_vmid = all_vmid
+    elif vmids:
+        for vmid in vmids:
+            if vmid not in exclude and vmid in all_vmid:
+                picked_vmid[vmid] = all_vmid[vmid]
+            else:
+                raise SystemExit('VM {0} not found.'.format(vmid))
+
+    if tags or exclude_tags:
+        proxmox_version = get_proxmox_version()
+        if not proxmox_version >= 7.3:
+            raise SystemExit('Proxmox version {0} does not support tags.'.format(proxmox_version))
+
+        vmids_by_tags = get_vmids_by_tags(tags=tags, exclude_tags=exclude_tags)
+
+        if tags:
+            for vmid_by_tags in vmids_by_tags['include']:
+                if vmid_by_tags in all_vmid:
+                    picked_vmid[vmid_by_tags] = all_vmid[vmid_by_tags]
+                else:
+                    raise SystemExit('VM {0} not found.'.format(vmid_by_tags))
+
+        if exclude_tags:
+            for vmid_by_tags in vmids_by_tags['exclude']:
+                picked_vmid.pop(vmid_by_tags, None)
+
+    return picked_vmid
 
 
 def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> None:
@@ -143,6 +216,8 @@ def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: 
 
     listsnapshot = []
     snapshots = run_command([virtualization, 'listsnapshot', vmid])
+    if not snapshots['status']:
+        raise SystemExit(snapshots['message'])
 
     for snapshot in snapshots['message'].splitlines():
         snapshot = re.search(r'auto{0}([_0-9T]+$)'.format(label), snapshot.replace('`->', '').split()[0])
@@ -194,16 +269,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--autosnap', action='store_true', help='Create a snapshot and delete the old one.')
     parser.add_argument('-s', '--snap', action='store_true', help='Create a snapshot but do not delete anything.')
-    parser.add_argument('-v', '--vmid', nargs='+', required=True,
-                        help='Space separated list of CT/VM ID or all for all CT/VM in node.')
+    parser.add_argument('-v', '--vmid', nargs='+', help='Space separated list of VM IDs or "all".')
+    parser.add_argument('-t', '--tags', nargs='+', help='Space separated list of tags.')
     parser.add_argument('-c', '--clean', action='store_true', help='Delete all or selected autosnapshots.')
     parser.add_argument('-k', '--keep', type=int, default=30, help='The number of snapshots which should will keep.')
     parser.add_argument('-l', '--label', choices=['minute', 'hourly', 'daily', 'weekly', 'monthly'], default='daily',
                         help='One of minute, hourly, daily, weekly or monthly.')
     parser.add_argument('--date-iso-format', action='store_true', help='Store snapshots in ISO 8601 format.')
     parser.add_argument('--date-truenas-format', action='store_true', help='Store snapshots in TrueNAS format.')
-    parser.add_argument('-e', '--exclude', nargs='+', default=[],
-                        help='Space separated list of CT/VM ID to exclude from processing.')
+    parser.add_argument('-e', '--exclude', nargs='+', default=[], help='Space separated list of VM IDs to exclude.')
+    parser.add_argument('--exclude-tags', nargs='+', default=[], help='Space separated list of tags to exclude.')
     parser.add_argument('-m', '--mute', action='store_true', help='Output only errors.')
     parser.add_argument('-r', '--running', action='store_true', help='Run only on running vm, skip on stopped')
     parser.add_argument('-i', '--includevmstate', action='store_true', help='Include the VM state in snapshots.')
@@ -214,6 +289,9 @@ def main():
     parser.add_argument('--sudo', action='store_true', help='Launch commands through sudo.')
     argp = parser.parse_args()
 
+    if not argp.vmid and not argp.tags and not argp.exclude_tags:
+        parser.error('At least one of --vmid or --tags or --exclude-tags is required.')
+
     global MUTE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT, DATE_TRUENAS_FORMAT
     MUTE = argp.mute
     DRY_RUN = argp.dryrun
@@ -223,14 +301,8 @@ def main():
     DATE_TRUENAS_FORMAT = argp.date_truenas_format
     INCLUDE_VM_STATE = argp.includevmstate
 
-    all_vmid = vmid_list(exclude=argp.exclude)
-
-    if 'all' in argp.vmid:
-        picked_vmid = dict(sorted(all_vmid.items()))
-    else:
-        picked_vmid = {}
-        for vm in argp.vmid:
-            picked_vmid[vm] = all_vmid[vm]
+    picked_vmid = get_filtered_vmids(vmids=argp.vmid, exclude=argp.exclude, tags=argp.tags,
+                                     exclude_tags=argp.exclude_tags)
 
     if argp.snap:
         for k, v in picked_vmid.items():
