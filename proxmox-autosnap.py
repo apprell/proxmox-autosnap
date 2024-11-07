@@ -244,12 +244,12 @@ def zfs_send(vmid: str, virtualization: str, zfs_send_to: str):
     cfg = get_pve_config(vmid, virtualization)
 
     for k, v in cfg.items():
+        proxmox_vol = v.split(',')[0]
         if (k == 'rootfs' or
                 (re.fullmatch('mp[0-9]+', k) and ('backup=1' in v)) or
-                (re.fullmatch('(ide|sata|scsi|virtio)[0-9]+', k) and ('backup=0' not in v)) or
+                (re.fullmatch('(ide|sata|scsi|virtio)[0-9]+', k) and ('backup=0' not in v) and proxmox_vol!="none") or
                 (re.fullmatch('(efidisk|tpmstate)[0-9]+', k))):
 
-            proxmox_vol = v.split(',')[0]
             localzfs = get_zfs_volume(proxmox_vol, virtualization)
             remotezfs = os.path.join(zfs_send_to, proxmox_vol.split(':')[1])
 
