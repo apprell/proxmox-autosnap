@@ -254,7 +254,7 @@ def zfs_send(vmid: str, virtualization: str, zfs_send_to: str):
         proxmox_vol = v.split(',')[0]
         if (k == 'rootfs' or
                 (re.fullmatch('mp[0-9]+', k) and ('backup=1' in v)) or
-                (re.fullmatch('(ide|sata|scsi|virtio)[0-9]+', k) and ('backup=0' not in v) and proxmox_vol!="none") or
+                (re.fullmatch('(ide|sata|scsi|virtio)[0-9]+', k) and ('backup=0' not in v) and proxmox_vol != 'none') or
                 (re.fullmatch('(efidisk|tpmstate)[0-9]+', k))):
 
             localzfs = get_zfs_volume(proxmox_vol, virtualization)
