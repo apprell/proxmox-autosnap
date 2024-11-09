@@ -16,6 +16,9 @@ DATE_ISO_FORMAT = False
 DATE_TRUENAS_FORMAT = False
 INCLUDE_VM_STATE = False
 
+# Name of the currently running node
+NODE_NAME = socket.gethostname().split('.')[0]
+
 
 def running(func):
     @functools.wraps(func)
@@ -109,13 +112,14 @@ def get_vmids(exclude: list) -> dict:
     except json.JSONDecodeError as e:
         raise SystemExit('Error decoding JSON: {0}'.format(e))
 
+    # Capture non-excluded, local VMs by type (vm vs container)
     result = {}
-    node = socket.gethostname().split('.')[0]
-    for key, value in json_data['ids'].items():
-        if value['type'] == 'lxc' and value['node'] == node and key not in exclude:
-            result[key] = 'pct'
-        elif value['type'] == 'qemu' and value['node'] == node and key not in exclude:
-            result[key] = 'qm'
+    for vmid, vm in json_data['ids'].items():
+        if vm['node'] == NODE_NAME and vmid not in exclude:
+            if vm['type'] == 'lxc':
+                result[vmid] = 'pct'
+            elif vm['type'] == 'qemu':
+                result[vmid] = 'qm'
 
     return result
 
@@ -134,6 +138,9 @@ def get_vmids_by_tags(tags: list, exclude_tags: list) -> dict:
     for vm in json_data:
         vmid = str(vm['vmid'])
         vm_tags = vm.get('tags', '').split(';')
+
+        if vm['node'] != NODE_NAME:
+            continue
 
         if tags and any(tag in vm_tags for tag in tags):
             result['include'].append(vmid)
