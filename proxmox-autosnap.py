@@ -15,6 +15,7 @@ ONLY_ON_RUNNING = False
 DATE_ISO_FORMAT = False
 DATE_TRUENAS_FORMAT = False
 INCLUDE_VM_STATE = False
+FORCE = False
 
 # Name of the currently running node
 NODE_NAME = socket.gethostname().split('.')[0]
@@ -236,6 +237,8 @@ def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: 
         if old_snapshots:
             for old_snapshot in old_snapshots:
                 params = [virtualization, 'delsnapshot', vmid, old_snapshot]
+                if FORCE:
+                    params.extend(["--force", "true"])
                 if DRY_RUN:
                     params.insert(0, 'sudo') if USE_SUDO else None
                     print(' '.join(params))
@@ -294,12 +297,13 @@ def main():
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='Do not create or delete snapshots, just print the commands.')
     parser.add_argument('--sudo', action='store_true', help='Launch commands through sudo.')
+    parser.add_argument('--force', action='store_true', help='Force removal from config file, even if disk snapshot deletion fails.')
     argp = parser.parse_args()
 
     if not argp.vmid and not argp.tags and not argp.exclude_tags:
         parser.error('At least one of --vmid or --tags or --exclude-tags is required.')
 
-    global MUTE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT, DATE_TRUENAS_FORMAT
+    global MUTE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT, DATE_TRUENAS_FORMAT, FORCE
     MUTE = argp.mute
     DRY_RUN = argp.dryrun
     USE_SUDO = argp.sudo
@@ -307,6 +311,7 @@ def main():
     DATE_ISO_FORMAT = argp.date_iso_format
     DATE_TRUENAS_FORMAT = argp.date_truenas_format
     INCLUDE_VM_STATE = argp.includevmstate
+    FORCE = argp.force
 
     picked_vmid = get_filtered_vmids(vmids=argp.vmid, exclude=argp.exclude, tags=argp.tags,
                                      exclude_tags=argp.exclude_tags)
