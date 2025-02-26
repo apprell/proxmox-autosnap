@@ -73,6 +73,22 @@ def vm_is_stopped(vmid: str, virtualization: str) -> bool:
     return False
 
 
+def vm_is_template(vmid: str, type: str) -> bool:
+    if type == 'lxc':
+        virtualization = 'pct'
+    elif type == 'qemu':
+        virtualization = 'qm'
+    else:
+        return False
+
+    run = run_command([virtualization, 'config', vmid])
+    if run['status'] and 'template: 1' in run['message'].splitlines():
+        print('VM {0} is a template.'.format(vmid)) if not MUTE else None
+        return True
+
+    return False
+
+
 def get_pve_config(vmid: str, virtualization: str) -> dict:
     run = run_command([virtualization, 'config', vmid])
     if not run['status']:
@@ -115,7 +131,7 @@ def get_vmids(exclude: list) -> dict:
     # Capture non-excluded, local VMs by type (vm vs container)
     result = {}
     for vmid, vm in json_data['ids'].items():
-        if vm['node'] == NODE_NAME and vmid not in exclude:
+        if vm['node'] == NODE_NAME and vmid not in exclude and not vm_is_template(vmid, vm['type']):
             if vm['type'] == 'lxc':
                 result[vmid] = 'pct'
             elif vm['type'] == 'qemu':
@@ -140,6 +156,9 @@ def get_vmids_by_tags(tags: list, exclude_tags: list) -> dict:
         vm_tags = vm.get('tags', '').split(';')
 
         if vm['node'] != NODE_NAME:
+            continue
+
+        if vm_is_template(vmid, vm['type']):
             continue
 
         if tags and any(tag in vm_tags for tag in tags):
