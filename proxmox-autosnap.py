@@ -257,7 +257,7 @@ def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: 
             for old_snapshot in old_snapshots:
                 params = [virtualization, 'delsnapshot', vmid, old_snapshot]
                 if FORCE:
-                    params.extend(["--force", "true"])
+                    params.extend(['--force', 'true'])
                 if DRY_RUN:
                     params.insert(0, 'sudo') if USE_SUDO else None
                     print(' '.join(params))

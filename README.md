@@ -13,25 +13,26 @@ chmod +x /root/proxmox-autosnap/proxmox-autosnap.py
 
 ## Help
 
-| Arguments           | Required | Type | Default | Description                                                   |
-|---------------------|----------|------|---------|---------------------------------------------------------------|
-| vmid                | no       | list | empty   | Space separated list of CT/VM IDs or `all`.                   |
-| snap                | no       | bool | false   | Create a snapshot but do not delete anything.                 |
-| autosnap            | no       | bool | false   | Create a snapshot and delete the old one.                     |
-| keep                | no       | int  | 30      | The number of snapshots which should will keep.               |
-| label               | no       | str  | daily   | One of `minute`, `hourly`, `daily`, `weekly`, `monthly`.      |
-| clean               | no       | bool | false   | Delete all or selected autosnapshots.                         |
-| exclude             | no       | list | empty   | Space separated list of CT/VM IDs to exclude from processing. |
-| mute                | no       | bool | false   | Output only errors.                                           |
-| running             | no       | bool | false   | Run only on running vm, skip on stopped.                      |
-| includevmstate      | no       | bool | false   | Include the VM state in snapshots.                            |
-| dryrun              | no       | bool | false   | Do not create or delete snapshots, just print the commands.   |
-| date-iso-format     | no       | bool | false   | Store snapshots in ISO 8601 format.                           |
-| date-truenas-format | no       | bool | false   | Store snapshots in TrueNAS format.                            |
-| sudo                | no       | bool | false   | Launch commands through sudo.                                 |
-| zfs-send-to         | no       | str  | empty   | Send a copy of zfs subvolumes to another host via syncoid     |
-| tags                | no       | list | empty   | Space separated list of tags                                  |
-| exclude-tags        | no       | list | empty   | Space separated list of tags to exclude                       |
+| Arguments           | Required | Type | Default | Description                                                     |
+|---------------------|----------|------|---------|-----------------------------------------------------------------|
+| vmid                | no       | list | empty   | Space separated list of CT/VM IDs or `all`.                     |
+| snap                | no       | bool | false   | Create a snapshot but do not delete anything.                   |
+| autosnap            | no       | bool | false   | Create a snapshot and delete the old one.                       |
+| keep                | no       | int  | 30      | The number of snapshots which should will keep.                 |
+| label               | no       | str  | daily   | One of `minute`, `hourly`, `daily`, `weekly`, `monthly`.        |
+| clean               | no       | bool | false   | Delete all or selected autosnapshots.                           |
+| exclude             | no       | list | empty   | Space separated list of CT/VM IDs to exclude from processing.   |
+| mute                | no       | bool | false   | Output only errors.                                             |
+| running             | no       | bool | false   | Run only on running vm, skip on stopped.                        |
+| includevmstate      | no       | bool | false   | Include the VM state in snapshots.                              |
+| dryrun              | no       | bool | false   | Do not create or delete snapshots, just print the commands.     |
+| date-iso-format     | no       | bool | false   | Store snapshots in ISO 8601 format.                             |
+| date-truenas-format | no       | bool | false   | Store snapshots in TrueNAS format.                              |
+| sudo                | no       | bool | false   | Launch commands through sudo.                                   |
+| zfs-send-to         | no       | str  | empty   | Send a copy of zfs subvolumes to another host via syncoid       |
+| tags                | no       | list | empty   | Space separated list of tags                                    |
+| exclude-tags        | no       | list | empty   | Space separated list of tags to exclude                         |
+| force               | no       | bool | false   | Force removal from the config, even if snapshot deletion fails. |
 
 > proxmox-autosnap.py --help
 
