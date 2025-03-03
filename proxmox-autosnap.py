@@ -67,24 +67,16 @@ def get_proxmox_version() -> float:
 
 def vm_is_stopped(vmid: str, virtualization: str) -> bool:
     run = run_command([virtualization, 'status', vmid])
-    if run['status']:
-        if 'stopped' in run['message'].lower():
-            return True
+    if run['status'] and 'stopped' in run['message'].lower():
+        print('VM {0} - is stopped, skipping...'.format(vmid)) if not MUTE else None
+        return True
 
     return False
 
-
-def vm_is_template(vmid: str, type: str) -> bool:
-    if type == 'lxc':
-        virtualization = 'pct'
-    elif type == 'qemu':
-        virtualization = 'qm'
-    else:
-        return False
-
+def vm_is_template(vmid: str, virtualization: str) -> bool:
     run = run_command([virtualization, 'config', vmid])
     if run['status'] and 'template: 1' in run['message'].splitlines():
-        print('VM {0} is a template.'.format(vmid)) if not MUTE else None
+        print('VM {0} - is a template, skipping...'.format(vmid)) if not MUTE else None
         return True
 
     return False
@@ -132,11 +124,21 @@ def get_vmids(exclude: list) -> dict:
     # Capture non-excluded, local VMs by type (vm vs container)
     result = {}
     for vmid, vm in json_data['ids'].items():
-        if vm['node'] == NODE_NAME and vmid not in exclude and not vm_is_template(vmid, vm['type']):
+        if vm['node'] == NODE_NAME and vmid not in exclude:
             if vm['type'] == 'lxc':
-                result[vmid] = 'pct'
+                virtualization = 'pct'
             elif vm['type'] == 'qemu':
-                result[vmid] = 'qm'
+                virtualization = 'qm'
+            else:
+                raise SystemExit('Unknown virtualization type: {0}'.format(vm['type']))
+
+            if vm_is_template(vmid, virtualization):
+                continue
+
+            if ONLY_ON_RUNNING and vm_is_stopped(vmid, virtualization):
+                continue
+
+            result[vmid] = virtualization
 
     return result
 
@@ -157,9 +159,6 @@ def get_vmids_by_tags(tags: list, exclude_tags: list) -> dict:
         vm_tags = vm.get('tags', '').split(';')
 
         if vm['node'] != NODE_NAME:
-            continue
-
-        if vm_is_template(vmid, vm['type']):
             continue
 
         if tags and any(tag in vm_tags for tag in tags):
@@ -206,10 +205,6 @@ def get_filtered_vmids(vmids: list, exclude: list, tags: list, exclude_tags: lis
 
 
 def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> None:
-    if ONLY_ON_RUNNING and vm_is_stopped(vmid, virtualization):
-        print('VM {0} - status is stopped, skipping...'.format(vmid)) if not MUTE else None
-        return
-
     labels = {'minute': 'autominute', 'hourly': 'autohourly', 'daily': 'autodaily', 'weekly': 'autoweekly',
               'monthly': 'automonthly'}
     suffix_datetime = datetime.now() + timedelta(seconds=1)
@@ -237,10 +232,6 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> Non
 
 
 def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: int = 30) -> None:
-    if ONLY_ON_RUNNING and vm_is_stopped(vmid, virtualization):
-        print('VM {0} - status is stopped, skipping...'.format(vmid)) if not MUTE else None
-        return
-
     listsnapshot = []
     snapshots = run_command([virtualization, 'listsnapshot', vmid])
     if not snapshots['status']:
@@ -316,7 +307,8 @@ def main():
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='Do not create or delete snapshots, just print the commands.')
     parser.add_argument('--sudo', action='store_true', help='Launch commands through sudo.')
-    parser.add_argument('--force', action='store_true', help='Force removal from config file, even if disk snapshot deletion fails.')
+    parser.add_argument('--force', action='store_true',
+                        help='Force removal from config file, even if disk snapshot deletion fails.')
     argp = parser.parse_args()
 
     if not argp.vmid and not argp.tags and not argp.exclude_tags:
