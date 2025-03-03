@@ -62,7 +62,7 @@ def get_proxmox_version() -> float:
     try:
         return float(version_string)
     except ValueError:
-        return float(".".join(version_string.split(".")[:2]))
+        return float('.'.join(version_string.split('.')[:2]))
 
 
 def vm_is_stopped(vmid: str, virtualization: str) -> bool:
@@ -74,8 +74,8 @@ def vm_is_stopped(vmid: str, virtualization: str) -> bool:
     return False
 
 def vm_is_template(vmid: str, virtualization: str) -> bool:
-    run = run_command([virtualization, 'config', vmid])
-    if run['status'] and 'template: 1' in run['message'].splitlines():
+    cfg = get_pve_config(vmid, virtualization)
+    if 'template' in cfg and cfg['template'] == '1':
         print('VM {0} - is a template, skipping...'.format(vmid)) if not MUTE else None
         return True
 
