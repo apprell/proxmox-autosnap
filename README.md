@@ -27,6 +27,7 @@ chmod +x /root/proxmox-autosnap/proxmox-autosnap.py
 | includevmstate      | no       | bool | false   | Include the VM state in snapshots.                              |
 | dryrun              | no       | bool | false   | Do not create or delete snapshots, just print the commands.     |
 | date-iso-format     | no       | bool | false   | Store snapshots in ISO 8601 format.                             |
+| date-human-format   | no       | bool | false   | Store snapshots in human readable format.                       |
 | date-truenas-format | no       | bool | false   | Store snapshots in TrueNAS format.                              |
 | sudo                | no       | bool | false   | Launch commands through sudo.                                   |
 | zfs-send-to         | no       | str  | empty   | Send a copy of zfs subvolumes to another host via syncoid       |
@@ -65,6 +66,11 @@ proxmox-autosnap.py --clean --vmid all --label hourly --keep 0
 # It is not necessary to specify the --date-iso-format argument to delete snapshots 
 proxmox-autosnap.py --snap --vmid 100 --date-iso-format
 
+# Create a snapshot name in human readable format
+# Example auto_daily_250303_134506
+# It is not necessary to specify the --date-human-format argument to delete snapshots 
+proxmox-autosnap.py --snap --vmid 100 --date-human-format
+
 # Create a snapshot name in TrueNAS format
 # Example autodaily20240212194857
 # It is not necessary to specify the --date-truenas-format argument to delete snapshots 
@@ -99,7 +105,8 @@ proxmox-autosnap.py --snap --vmid 100 --date-iso-format --sudo
 ## zfs-send-to
 
 To use option `zfs-send-to`, you need to install `syncoid`, and enable zfs
-permissions on both local and target hosts. See [documentation on configuring zfs allow for syncoid](https://github.com/jimsalterjrs/sanoid/wiki/Syncoid#running-without-root)
+permissions on both local and target hosts.
+See [documentation on configuring zfs allow for syncoid](https://github.com/jimsalterjrs/sanoid/wiki/Syncoid#running-without-root)
 for more information.
 
 Option should be set to `[user@]host:zfsdir`. All subvolumes of specified VMs

@@ -9,13 +9,14 @@ import subprocess
 from datetime import datetime, timedelta
 
 MUTE = False
+FORCE = False
 DRY_RUN = False
 USE_SUDO = False
 ONLY_ON_RUNNING = False
 DATE_ISO_FORMAT = False
+DATE_HUMAN_FORMAT = False
 DATE_TRUENAS_FORMAT = False
 INCLUDE_VM_STATE = False
-FORCE = False
 
 # Name of the currently running node
 NODE_NAME = socket.gethostname().split('.')[0]
@@ -26,7 +27,7 @@ def running(func):
     def create_pid(*args, **kwargs):
         pid = str(os.getpid())
         location = os.path.dirname(os.path.realpath(__file__))
-        location_pid = os.path.join(location, 'running.pid')
+        location_pid = os.path.join(location, '{0}.running.pid'.format(NODE_NAME))
         if os.path.isfile(location_pid):
             with open(location_pid) as f:
                 print('Script already running under PID {0}, skipping execution.'.format(f.read()))
@@ -72,6 +73,7 @@ def vm_is_stopped(vmid: str, virtualization: str) -> bool:
         return True
 
     return False
+
 
 def vm_is_template(vmid: str, virtualization: str) -> bool:
     cfg = get_pve_config(vmid, virtualization)
@@ -207,9 +209,13 @@ def get_filtered_vmids(vmids: list, exclude: list, tags: list, exclude_tags: lis
 def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> None:
     labels = {'minute': 'autominute', 'hourly': 'autohourly', 'daily': 'autodaily', 'weekly': 'autoweekly',
               'monthly': 'automonthly'}
+    if DATE_HUMAN_FORMAT:
+        labels = {key: f'auto_{key}_' for key in labels}
     suffix_datetime = datetime.now() + timedelta(seconds=1)
     if DATE_ISO_FORMAT:
         suffix = '_' + suffix_datetime.isoformat(timespec='seconds').replace('-', '_').replace(':', '_')
+    elif DATE_HUMAN_FORMAT:
+        suffix = suffix_datetime.strftime('%y%m%d_%H%M%S')
     elif DATE_TRUENAS_FORMAT:
         suffix = suffix_datetime.strftime('%Y%m%d%H%M%S')
     else:
@@ -238,12 +244,12 @@ def remove_snapshot(vmid: str, virtualization: str, label: str = 'daily', keep: 
         raise SystemExit(snapshots['message'])
 
     for snapshot in snapshots['message'].splitlines():
-        snapshot = re.search(r'auto{0}([_0-9T]+$)'.format(label), snapshot.replace('`->', '').split()[0])
+        snapshot = re.search(r'auto(_?){0}([_0-9T]+$)'.format(label), snapshot.replace('`->', '').split()[0])
         if snapshot is not None:
             listsnapshot.append(snapshot.group(0))
 
     if listsnapshot and len(listsnapshot) > keep:
-        old_snapshots = [snap for num, snap in enumerate(sorted(listsnapshot, reverse=True), 1) if num > keep]
+        old_snapshots = [snap for num, snap in enumerate(sorted(listsnapshot, reverse=True, key=lambda x: x.replace('_', '')), 1) if num > keep]
         if old_snapshots:
             for old_snapshot in old_snapshots:
                 params = [virtualization, 'delsnapshot', vmid, old_snapshot]
@@ -296,6 +302,7 @@ def main():
     parser.add_argument('-l', '--label', choices=['minute', 'hourly', 'daily', 'weekly', 'monthly'], default='daily',
                         help='One of minute, hourly, daily, weekly or monthly.')
     parser.add_argument('--date-iso-format', action='store_true', help='Store snapshots in ISO 8601 format.')
+    parser.add_argument('--date-human-format', action='store_true', help='Store snapshots in human readable format.')
     parser.add_argument('--date-truenas-format', action='store_true', help='Store snapshots in TrueNAS format.')
     parser.add_argument('-e', '--exclude', nargs='+', default=[], help='Space separated list of VM IDs to exclude.')
     parser.add_argument('--exclude-tags', nargs='+', default=[], help='Space separated list of tags to exclude.')
@@ -314,15 +321,16 @@ def main():
     if not argp.vmid and not argp.tags and not argp.exclude_tags:
         parser.error('At least one of --vmid or --tags or --exclude-tags is required.')
 
-    global MUTE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT, DATE_TRUENAS_FORMAT, FORCE
+    global MUTE, FORCE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT, DATE_HUMAN_FORMAT, DATE_TRUENAS_FORMAT
     MUTE = argp.mute
+    FORCE = argp.force
     DRY_RUN = argp.dryrun
     USE_SUDO = argp.sudo
     ONLY_ON_RUNNING = argp.running
     DATE_ISO_FORMAT = argp.date_iso_format
+    DATE_HUMAN_FORMAT = argp.date_human_format
     DATE_TRUENAS_FORMAT = argp.date_truenas_format
     INCLUDE_VM_STATE = argp.includevmstate
-    FORCE = argp.force
 
     picked_vmid = get_filtered_vmids(vmids=argp.vmid, exclude=argp.exclude, tags=argp.tags,
                                      exclude_tags=argp.exclude_tags)
