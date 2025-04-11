@@ -90,11 +90,10 @@ def get_pve_config(vmid: str, virtualization: str) -> dict:
         raise SystemExit(run['message'])
 
     cfg = {}
-
     for line in run['message'].splitlines():
-        if ':' in line:
-            (k, v) = line.split(': ')
-            cfg[k.strip()] = v.strip()
+        parts = line.strip().split(': ', 1)
+        if len(parts) == 2:
+            cfg[parts[0].strip()] = parts[1].strip()
 
     return cfg
 
