@@ -34,6 +34,7 @@ chmod +x /root/proxmox-autosnap/proxmox-autosnap.py
 | tags                | no       | list | empty   | Space separated list of tags                                    |
 | exclude-tags        | no       | list | empty   | Space separated list of tags to exclude                         |
 | force               | no       | bool | false   | Force removal from the config, even if snapshot deletion fails. |
+| check-free-space    | no       | bool | false   | Verify sufficient storage space before snapshot creation.       |
 
 > proxmox-autosnap.py --help
 

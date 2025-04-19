@@ -17,6 +17,7 @@ DATE_ISO_FORMAT = False
 DATE_HUMAN_FORMAT = False
 DATE_TRUENAS_FORMAT = False
 INCLUDE_VM_STATE = False
+CHECK_FREE_SPACE = False
 
 # Name of the currently running node
 NODE_NAME = socket.gethostname().split('.')[0]
@@ -112,6 +113,49 @@ def get_zfs_volume(proxmox_fs: str, virtualization: str) -> str:
         return zfsvol
 
 
+def fetch_storage_details() -> dict:
+    if not CHECK_FREE_SPACE:
+        return {}
+
+    cmd = [
+        'pvesh', 'get',
+        '/nodes/{0}/storage'.format(NODE_NAME),
+        '--content', 'rootdir',
+        '--enabled', '1',
+        '--output-format', 'json',
+    ]
+    run = run_command(cmd)
+    if not run['status']:
+        raise SystemExit(run['message'])
+
+    try:
+        storages = json.loads(run['message'])
+    except json.JSONDecodeError as e:
+        raise SystemExit('Error decoding JSON: {0}'.format(e))
+
+    result = {}
+    for storage in storages:
+        storage_name = storage.get('storage')
+        cmd = [
+            'pvesh', 'get',
+            '/nodes/{0}/storage/{1}/content'.format(NODE_NAME, storage_name),
+            '--output-format', 'json'
+        ]
+        run = run_command(cmd)
+        if not run['status']:
+            raise SystemExit(run['message'])
+
+        try:
+            content = json.loads(run['message'])
+        except json.JSONDecodeError as e:
+            raise SystemExit('Error decoding JSON: {0}'.format(e))
+
+        vmids = sorted({int(item['vmid']) for item in content if 'vmid' in item})
+        result[storage_name] = {'used_fraction': round(storage.get('used_fraction'), 2), 'vmids': vmids}
+
+    return result
+
+
 def get_vmids(exclude: list) -> dict:
     run = run_command(['cat', '/etc/pve/.vmlist'])
     if not run['status']:
@@ -124,6 +168,7 @@ def get_vmids(exclude: list) -> dict:
 
     # Capture non-excluded, local VMs by type (vm vs container)
     result = {}
+    storages = fetch_storage_details()
     for vmid, vm in json_data['ids'].items():
         if vm['node'] == NODE_NAME and vmid not in exclude:
             if vm['type'] == 'lxc':
@@ -137,6 +182,10 @@ def get_vmids(exclude: list) -> dict:
                 continue
 
             if ONLY_ON_RUNNING and vm_is_stopped(vmid, virtualization):
+                continue
+
+            if any(info['used_fraction'] >= 0.99 and int(vmid) in info['vmids'] for info in storages.values()):
+                print(f'VM {vmid} - Storage usage is above 99%, skipping...') if not MUTE else None
                 continue
 
             result[vmid] = virtualization
@@ -315,12 +364,14 @@ def main():
     parser.add_argument('--sudo', action='store_true', help='Launch commands through sudo.')
     parser.add_argument('--force', action='store_true',
                         help='Force removal from config file, even if disk snapshot deletion fails.')
+    parser.add_argument('--check-free-space', action='store_true',
+                        help='Check if there is enough free space on the storage before creating a snapshot.')
     argp = parser.parse_args()
 
     if not argp.vmid and not argp.tags and not argp.exclude_tags:
         parser.error('At least one of --vmid or --tags or --exclude-tags is required.')
 
-    global MUTE, FORCE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT, DATE_HUMAN_FORMAT, DATE_TRUENAS_FORMAT
+    global MUTE, FORCE, DRY_RUN, USE_SUDO, ONLY_ON_RUNNING, INCLUDE_VM_STATE, DATE_ISO_FORMAT, DATE_HUMAN_FORMAT, DATE_TRUENAS_FORMAT, CHECK_FREE_SPACE
     MUTE = argp.mute
     FORCE = argp.force
     DRY_RUN = argp.dryrun
@@ -330,6 +381,7 @@ def main():
     DATE_HUMAN_FORMAT = argp.date_human_format
     DATE_TRUENAS_FORMAT = argp.date_truenas_format
     INCLUDE_VM_STATE = argp.includevmstate
+    CHECK_FREE_SPACE = argp.check_free_space
 
     picked_vmid = get_filtered_vmids(vmids=argp.vmid, exclude=argp.exclude, tags=argp.tags,
                                      exclude_tags=argp.exclude_tags)
