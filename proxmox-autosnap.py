@@ -185,7 +185,7 @@ def get_vmids(exclude: list) -> dict:
                 continue
 
             if any(info['used_fraction'] >= 0.99 and int(vmid) in info['vmids'] for info in storages.values()):
-                print(f'VM {vmid} - Storage usage is above 99%, skipping...') if not MUTE else None
+                print('VM {0} - Storage usage is above 99%, skipping...'.format(vmid)) if not MUTE else None
                 continue
 
             result[vmid] = virtualization
@@ -258,7 +258,7 @@ def create_snapshot(vmid: str, virtualization: str, label: str = 'daily') -> Non
     labels = {'minute': 'autominute', 'hourly': 'autohourly', 'daily': 'autodaily', 'weekly': 'autoweekly',
               'monthly': 'automonthly'}
     if DATE_HUMAN_FORMAT:
-        labels = {key: f'auto_{key}_' for key in labels}
+        labels = {key: 'auto_{0}_'.format(key) for key in labels}
     suffix_datetime = datetime.now() + timedelta(seconds=1)
     if DATE_ISO_FORMAT:
         suffix = '_' + suffix_datetime.isoformat(timespec='seconds').replace('-', '_').replace(':', '_')
