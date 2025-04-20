@@ -114,7 +114,7 @@ Option should be set to `[user@]host:zfsdir`. All subvolumes of specified VMs
 will be copied to this path, including `rootfs` and `mpX` mount points with
 backup option enabled on Proxmox.
 
-## Cron
+## CRON
 
 ```bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
@@ -139,4 +139,23 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 > [!WARNING]  
 > If the script is stored in `/etc/pve/`, it must be executed with `python` or `python3`, as this directory does not
-support the executable attribute.
+> support the executable attribute.
+
+## LVM
+
+When using this script with LVM-based storage, it's important to be aware that every time an LVM snapshot is created,
+LVM stores a backup of the volume group configuration in the `/etc/lvm/archive` directory. If the snapshot script is
+executed frequently (e.g., hourly), this directory can accumulate a large number of files over time, potentially
+consuming significant disk space.
+
+To mitigate this, consider setting up a cron job or other cleanup mechanism to periodically remove older files from
+`/etc/lvm/archive`. For example:
+
+```bash
+# Remove LVM archive files older than 7 days
+find /etc/lvm/archive -type f -mtime +7 -delete
+```
+
+At the moment, skipping LVM snapshots entirely is not feasible, especially in environments where virtual machines or
+containers might use a mix of LVM and ZFS storage backends. Be sure to monitor this directory and adjust your cleanup
+policy accordingly.
