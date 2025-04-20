@@ -129,11 +129,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 5 0 1 * * root /usr/local/sbin/proxmox-autosnap.py --autosnap --vmid all --label monthly --keep 3 --mute
 ```
 
-**WARNING**
-
-If the script is stored in `/etc/pve/`, it must be executed with `python` or `python3`, as this directory does not
-support the executable attribute.
-
 ```bash
 # Task for snapshot every hour from 1 through 23.
 5 1-23 * * * root /usr/bin/python3 /etc/pve/bin/autosnap/proxmox-autosnap.py --autosnap --vmid all --label hourly --keep 15 --mute
@@ -141,3 +136,7 @@ support the executable attribute.
 # Task for snapshot every day-of-month from 2 through 31.
 5 0 2-31 * * root /usr/bin/python3 /etc/pve/bin/autosnap/proxmox-autosnap.py --autosnap --vmid all --label daily  --keep  7 --mute
 ```
+
+> [!WARNING]  
+> If the script is stored in `/etc/pve/`, it must be executed with `python` or `python3`, as this directory does not
+support the executable attribute.
