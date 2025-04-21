@@ -93,7 +93,7 @@ In order to run with sudo argument, you must first create a user and specify min
 Cmnd_Alias VMLIST = /usr/bin/cat /etc/pve/.vmlist
 Cmnd_Alias PCT = /usr/sbin/pct snapshot *, /usr/sbin/pct listsnapshot *, /usr/sbin/pct delsnapshot *
 Cmnd_Alias QM = /usr/sbin/qm snapshot *, /usr/sbin/qm listsnapshot *, /usr/sbin/qm delsnapshot *
-Cmnd_Alias PVESH = /usr/bin/pvesh get /cluster/resources --type vm --output-format json
+Cmnd_Alias PVESH = /usr/bin/pvesh get /cluster/resources --type vm --output-format json, /usr/bin/pvesh get /nodes/*/storage --content rootdir --enabled 1 --output-format json, /usr/bin/pvesh get /nodes/*/storage/*/content --output-format json
 proxmox-backup ALL=NOPASSWD: VMLIST,PCT,QM,PVESH
 ```
 
