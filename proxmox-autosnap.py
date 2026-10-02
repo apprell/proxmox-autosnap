@@ -5,6 +5,7 @@ import json
 import socket
 import argparse
 import functools
+import fcntl
 import subprocess
 from datetime import datetime, timedelta
 
@@ -29,16 +30,18 @@ def running(func):
         pid = str(os.getpid())
         location = os.path.dirname(os.path.realpath(__file__))
         location_pid = os.path.join(location, '{0}.running.pid'.format(NODE_NAME))
-        if os.path.isfile(location_pid):
-            with open(location_pid) as f:
+        with open(location_pid, 'a+') as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                f.seek(0)
                 print('Script already running under PID {0}, skipping execution.'.format(f.read()))
-            raise SystemExit(1)
-        try:
-            with open(location_pid, 'w') as f:
-                f.write(pid)
+                raise SystemExit(1)
+            f.seek(0)
+            f.truncate()
+            f.write(pid)
+            f.flush()
             return func(*args, **kwargs)
-        finally:
-            os.unlink(location_pid)
 
     return create_pid
 
