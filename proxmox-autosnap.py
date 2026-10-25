@@ -188,7 +188,7 @@ def get_vmids(exclude: list) -> dict:
                 continue
 
             if any(info['used_fraction'] >= 0.99 and int(vmid) in info['vmids'] for info in storages.values()):
-                print('VM {0} - Storage usage is above 99%, skipping...'.format(vmid)) if not MUTE else None
+                print('VM {0} - Storage usage is above 99%, skipping...'.format(vmid))
                 continue
 
             result[vmid] = virtualization
