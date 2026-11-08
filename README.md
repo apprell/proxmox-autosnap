@@ -1,6 +1,6 @@
 # Proxmox Autosnap
 
-A simple script written on python to control zfs proxmox snapshots via pct or qm.
+A simple Python script to manage Proxmox snapshots via `pct` or `qm`.
 
 ## Installing
 
@@ -13,71 +13,71 @@ chmod +x /root/proxmox-autosnap/proxmox-autosnap.py
 
 ## Help
 
-| Arguments           | Required | Type | Default | Description                                                     |
-|---------------------|----------|------|---------|-----------------------------------------------------------------|
-| vmid                | no       | list | empty   | Space separated list of CT/VM IDs or `all`.                     |
-| snap                | no       | bool | false   | Create a snapshot but do not delete anything.                   |
-| autosnap            | no       | bool | false   | Create a snapshot and delete the old one.                       |
-| keep                | no       | int  | 30      | The number of snapshots which should will keep.                 |
-| label               | no       | str  | daily   | One of `minute`, `hourly`, `daily`, `weekly`, `monthly`.        |
-| clean               | no       | bool | false   | Delete all or selected autosnapshots.                           |
-| exclude             | no       | list | empty   | Space separated list of CT/VM IDs to exclude from processing.   |
-| mute                | no       | bool | false   | Output only errors.                                             |
-| running             | no       | bool | false   | Run only on running vm, skip on stopped.                        |
-| includevmstate      | no       | bool | false   | Include the VM state in snapshots.                              |
-| dryrun              | no       | bool | false   | Do not create or delete snapshots, just print the commands.     |
-| date-iso-format     | no       | bool | false   | Store snapshots in ISO 8601 format.                             |
-| date-human-format   | no       | bool | false   | Store snapshots in human readable format.                       |
-| date-truenas-format | no       | bool | false   | Store snapshots in TrueNAS format.                              |
-| sudo                | no       | bool | false   | Launch commands through sudo.                                   |
-| zfs-send-to         | no       | str  | empty   | Send a copy of zfs subvolumes to another host via syncoid       |
-| tags                | no       | list | empty   | Space separated list of tags                                    |
-| exclude-tags        | no       | list | empty   | Space separated list of tags to exclude                         |
-| force               | no       | bool | false   | Force removal from the config, even if snapshot deletion fails. |
-| check-free-space    | no       | bool | false   | Verify sufficient storage space before snapshot creation.       |
+| Arguments             | Required   | Type   | Default   | Description                                                              |
+|-----------------------|------------|--------|-----------|--------------------------------------------------------------------------|
+| vmid                  | no         | list   | empty     | Space-separated list of CT/VM IDs or `all`.                              |
+| snap                  | no         | bool   | false     | Create a snapshot but do not delete anything.                            |
+| autosnap              | no         | bool   | false     | Create a snapshot and delete older snapshots beyond the retention limit. |
+| keep                  | no         | int    | 30        | The number of snapshots to keep.                                         |
+| label                 | no         | str    | daily     | One of `minute`, `hourly`, `daily`, `weekly`, `monthly`.                 |
+| clean                 | no         | bool   | false     | Delete all or selected autosnapshots.                                    |
+| exclude               | no         | list   | empty     | Space-separated list of CT/VM IDs to exclude from processing.            |
+| mute                  | no         | bool   | false     | Output only errors.                                                      |
+| running               | no         | bool   | false     | Process only running VMs and containers; skip stopped ones.              |
+| includevmstate        | no         | bool   | false     | Include the VM state in snapshots.                                       |
+| dryrun                | no         | bool   | false     | Do not create or delete snapshots, just print the commands.              |
+| date-iso-format       | no         | bool   | false     | Store snapshots in ISO 8601 format.                                      |
+| date-human-format     | no         | bool   | false     | Store snapshots in human-readable format.                                |
+| date-truenas-format   | no         | bool   | false     | Store snapshots in TrueNAS format.                                       |
+| sudo                  | no         | bool   | false     | Launch commands through sudo.                                            |
+| zfs-send-to           | no         | str    | empty     | Send a copy of ZFS volumes to another host via syncoid.                  |
+| tags                  | no         | list   | empty     | Space-separated list of tags.                                            |
+| exclude-tags          | no         | list   | empty     | Space-separated list of tags to exclude.                                 |
+| force                 | no         | bool   | false     | Force removal from the config, even if snapshot deletion fails.          |
+| check-free-space      | no         | bool   | false     | Verify sufficient storage space before snapshot creation.                |
 
 > proxmox-autosnap.py --help
 
 ## Examples
 
 ```bash
-# Create a daily snapshot for all VM
+# Create a daily snapshot for all VMs
 proxmox-autosnap.py --snap --vmid all
 
-# Create snapshot only on running vm
+# Create snapshots only for running VMs and containers
 proxmox-autosnap.py --snap --vmid all --running
 
-# Create a daily snapshot for selected VM
+# Create a daily snapshot for selected VMs
 proxmox-autosnap.py --snap --vmid 100 101 102
 
-# Create a daily snapshot for all VM with the exception of 100 101 102
+# Create a daily snapshot for all VMs except 100, 101, and 102
 proxmox-autosnap.py --snap --vmid all --exclude 100 101 102
 
-# Delete all daily autosnapshots for selected VM
+# Delete all daily autosnapshots for selected VMs
 proxmox-autosnap.py --clean --vmid 100 101 102 --keep 0
 
-# Create a hourly snapshot for all VM
+# Create an hourly snapshot for all VMs
 proxmox-autosnap.py --snap --vmid all --label hourly
 
-# Delete all hourly autosnapshots for all VM
+# Delete all hourly autosnapshots for all VMs
 proxmox-autosnap.py --clean --vmid all --label hourly --keep 0
 
-# Create a snapshot name in ISO 8601 format
+# Create a snapshot with a name in ISO 8601 format
 # Example autodaily_2023_03_22T01_26_23
 # It is not necessary to specify the --date-iso-format argument to delete snapshots 
 proxmox-autosnap.py --snap --vmid 100 --date-iso-format
 
-# Create a snapshot name in human readable format
+# Create a snapshot with a name in human-readable format
 # Example auto_daily_250303_134506
 # It is not necessary to specify the --date-human-format argument to delete snapshots 
 proxmox-autosnap.py --snap --vmid 100 --date-human-format
 
-# Create a snapshot name in TrueNAS format
+# Create a snapshot with a name in TrueNAS format
 # Example autodaily20240212194857
 # It is not necessary to specify the --date-truenas-format argument to delete snapshots 
 proxmox-autosnap.py --snap --vmid 100 --date-truenas-format
 
-# Create a snapshot filtered by tags and exclude tags
+# Create snapshots selected by tags or exclude VMs with specified tags
 # Tags are supported only in Proxmox version 7.3 and above
 proxmox-autosnap.py --sudo --snap --tags snap --label hourly
 proxmox-autosnap.py --sudo --snap --vmid all --label hourly --exclude-tags nosnap
@@ -85,7 +85,7 @@ proxmox-autosnap.py --sudo --snap --vmid all --label hourly --exclude-tags nosna
 
 ## SUDO
 
-In order to run with sudo argument, you must first create a user and specify minimum accesses for him, for example:
+To run with the `--sudo` argument, first create a user and grant the required permissions, for example:
 
 `cat /etc/sudoers.d/proxmox-backup`
 
@@ -97,7 +97,7 @@ Cmnd_Alias PVESH = /usr/bin/pvesh get /cluster/resources --type vm --output-form
 proxmox-backup ALL=NOPASSWD: VMLIST,PCT,QM,PVESH
 ```
 
-After that you can run the script with the argument
+Then run the script with the `--sudo` argument:
 
 ```bash
 proxmox-autosnap.py --snap --vmid 100 --date-iso-format --sudo
@@ -105,14 +105,14 @@ proxmox-autosnap.py --snap --vmid 100 --date-iso-format --sudo
 
 ## zfs-send-to
 
-To use option `zfs-send-to`, you need to install `syncoid`, and enable zfs
+To use the `--zfs-send-to` option, install `syncoid` and configure ZFS
 permissions on both local and target hosts.
 See [documentation on configuring zfs allow for syncoid](https://github.com/jimsalterjrs/sanoid/wiki/Syncoid#running-without-root)
 for more information.
 
-Option should be set to `[user@]host:zfsdir`. All subvolumes of specified VMs
+Set the option to `[user@]host:zfsdir`. All volumes of the specified VMs
 will be copied to this path, including `rootfs` and `mpX` mount points with
-backup option enabled on Proxmox.
+the backup option enabled in Proxmox.
 
 ## CRON
 

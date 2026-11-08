@@ -73,7 +73,7 @@ def get_proxmox_version() -> float:
 def vm_is_stopped(vmid: str, virtualization: str) -> bool:
     run = run_command([virtualization, 'status', vmid])
     if run['status'] and 'stopped' in run['message'].lower():
-        print('VM {0} - is stopped, skipping...'.format(vmid)) if not MUTE else None
+        print('VM {0} - Stopped, skipping...'.format(vmid)) if not MUTE else None
         return True
 
     return False
@@ -82,7 +82,7 @@ def vm_is_stopped(vmid: str, virtualization: str) -> bool:
 def vm_is_template(vmid: str, virtualization: str) -> bool:
     cfg = get_pve_config(vmid, virtualization)
     if 'template' in cfg and cfg['template'] == '1':
-        print('VM {0} - is a template, skipping...'.format(vmid)) if not MUTE else None
+        print('VM {0} - Template, skipping...'.format(vmid)) if not MUTE else None
         return True
 
     return False
@@ -344,29 +344,29 @@ def zfs_send(vmid: str, virtualization: str, zfs_send_to: str):
 @running
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--autosnap', action='store_true', help='Create a snapshot and delete the old one.')
+    parser.add_argument('-a', '--autosnap', action='store_true', help='Create a snapshot and delete older snapshots beyond the retention limit.')
     parser.add_argument('-s', '--snap', action='store_true', help='Create a snapshot but do not delete anything.')
-    parser.add_argument('-v', '--vmid', nargs='+', help='Space separated list of VM IDs or "all".')
-    parser.add_argument('-t', '--tags', nargs='+', help='Space separated list of tags.')
+    parser.add_argument('-v', '--vmid', nargs='+', help='Space-separated list of VM IDs or "all".')
+    parser.add_argument('-t', '--tags', nargs='+', help='Space-separated list of tags.')
     parser.add_argument('-c', '--clean', action='store_true', help='Delete all or selected autosnapshots.')
     parser.add_argument('-k', '--keep', type=int, default=30, help='The number of snapshots to keep.')
     parser.add_argument('-l', '--label', choices=['minute', 'hourly', 'daily', 'weekly', 'monthly'], default='daily',
                         help='One of minute, hourly, daily, weekly or monthly.')
     parser.add_argument('--date-iso-format', action='store_true', help='Store snapshots in ISO 8601 format.')
-    parser.add_argument('--date-human-format', action='store_true', help='Store snapshots in human readable format.')
+    parser.add_argument('--date-human-format', action='store_true', help='Store snapshots in human-readable format.')
     parser.add_argument('--date-truenas-format', action='store_true', help='Store snapshots in TrueNAS format.')
-    parser.add_argument('-e', '--exclude', nargs='+', default=[], help='Space separated list of VM IDs to exclude.')
-    parser.add_argument('--exclude-tags', nargs='+', default=[], help='Space separated list of tags to exclude.')
+    parser.add_argument('-e', '--exclude', nargs='+', default=[], help='Space-separated list of VM IDs to exclude.')
+    parser.add_argument('--exclude-tags', nargs='+', default=[], help='Space-separated list of tags to exclude.')
     parser.add_argument('-m', '--mute', action='store_true', help='Output only errors.')
-    parser.add_argument('-r', '--running', action='store_true', help='Run only on running vm, skip on stopped')
+    parser.add_argument('-r', '--running', action='store_true', help='Process only running VMs and containers; skip stopped ones.')
     parser.add_argument('-i', '--includevmstate', action='store_true', help='Include the VM state in snapshots.')
     parser.add_argument('--zfs-send-to', metavar='[USER@]HOST:ZFSDIR',
-                        help='Send zfs snapshot to USER@HOST on ZFSDIR hierarchy - USER@ is optional with syncoid > 2:1')
+                        help='Send ZFS snapshots to USER@HOST under ZFSDIR - USER@ is optional with syncoid > 2:1')
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='Do not create or delete snapshots, just print the commands.')
     parser.add_argument('--sudo', action='store_true', help='Launch commands through sudo.')
     parser.add_argument('--force', action='store_true',
-                        help='Force removal from config file, even if disk snapshot deletion fails.')
+                        help='Force removal from the config file, even if disk snapshot deletion fails.')
     parser.add_argument('--check-free-space', action='store_true',
                         help='Check if there is enough free space on the storage before creating a snapshot.')
     argp = parser.parse_args()
