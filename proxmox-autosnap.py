@@ -349,7 +349,7 @@ def main():
     parser.add_argument('-v', '--vmid', nargs='+', help='Space separated list of VM IDs or "all".')
     parser.add_argument('-t', '--tags', nargs='+', help='Space separated list of tags.')
     parser.add_argument('-c', '--clean', action='store_true', help='Delete all or selected autosnapshots.')
-    parser.add_argument('-k', '--keep', type=int, default=30, help='The number of snapshots which should will keep.')
+    parser.add_argument('-k', '--keep', type=int, default=30, help='The number of snapshots to keep.')
     parser.add_argument('-l', '--label', choices=['minute', 'hourly', 'daily', 'weekly', 'monthly'], default='daily',
                         help='One of minute, hourly, daily, weekly or monthly.')
     parser.add_argument('--date-iso-format', action='store_true', help='Store snapshots in ISO 8601 format.')
